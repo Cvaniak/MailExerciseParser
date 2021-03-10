@@ -70,13 +70,19 @@ def parse_options():
 	                  help="Older mails than this date will be chcked", callback=callback_date)
 	parser.add_option("-x", "--ex_from",
 	                  action="store", type="int", dest="ex_from",
-	                  help="The smallest index of exercise")
+	                  help="The lowest index of exercise")
 	parser.add_option("-y", "--ex_to",
 	                  action="store", type="int", dest="ex_to",
-	                  help="The smallest index of exercise")
+	                  help="The highest index of exercise")
 	parser.add_option("-z", "--ex_manualy",
 	                  action="callback", type="string",
-	                  help="The smallest index of exercise", callback=callback_set_manualy)
+	                  help="Manualy set index of exercise X,Y,Z,...", callback=callback_set_manualy)
+	parser.add_option("-o", "--output_file", dest="output_file",
+	                  action="store", type="string",
+	                  help="Output file name")
+	parser.add_option("-a", "--assign_number",
+	                  action="store", type="int", default=100,
+	                  help="How many iteration of assign algorithm (possible failures)")
 
 	return parser
 
@@ -86,7 +92,9 @@ class Declaration:
 	def __init__(self, mailObject):
 		self.subject = mailObject.subject
 		self.uid = mailObject.uid
-		self.name = mailObject.from_values["email"].split("@")[0]
+		self.index = mailObject.from_values["email"].split("@")[0]
+		self.name = mailObject.from_values["name"]
+		self.mail = mailObject.from_values["email"]
 		# self.name = mailObject.from_values['name']
 		self.date = mailObject.date
 
@@ -109,6 +117,7 @@ class Declaration:
 
 	def __str__(self):
 		return (f"uID = {self.uid}\n"
+			f"Mail = {self.mail}\n"
 			f"Name = {self.name}\n"
 			f"Date = {self.date}\n"
 			f"Subject = {self.subject}\n"
@@ -125,55 +134,49 @@ def get_mails(options):
 	    msg = mailbox.fetch(AND(date_gte=options.date_from.date(), date_lt=options.date_to.date()), mark_seen=False, reverse=True)
 	    for i in msg:
 	    	dec = Declaration(i)
-	    	if not dec.parse_subject() and not (dec.name in temp_name):
+	    	if not dec.parse_subject() and not (dec.mail in temp_name):
 	    		mail_list.append(dec)
-	    		temp_name.append(dec.name)
+	    		temp_name.append(dec.mail)
+
 	return mail_list
 
 
-def assign_alg(d_list, ex_list):
+def assign_alg(d_list, ex_list, options):
 	ex_dict = defaultdict(set)
 	for ex in ex_list:
 		for d in d_list:
 			if ex in d.declared_ex:
-				ex_dict[ex].add(d.name)
-	# print(ex_dict.items())
+				ex_dict[ex].add(d.uid)
+
 	ex_dict_sorted = {k: v for k, v in sorted(ex_dict.items(), key=lambda x: len(x[1]))}
-	# print(ex_dict_sorted)
-	# while True:	
+
 	keys = [k for k, v in ex_dict_sorted.items()]
-	counter = 100
+	counter = options.assign_number
 	while counter > 0:
 		counter -= 1
 		try:
+			print_multi("-", end="")
 			ex_temp = copy.deepcopy(ex_dict_sorted)
 			end_list = []
-			print("-", end="")
 			for i, k in enumerate(keys):
-				# print("|", end="")
 				choice = random.choice(tuple(ex_temp[k]))
 				end_list.append((k, choice))
-				ex_temp[k] = set()
-				ex_temp[k].add(choice)
-				# print(choice)
+
 				for z in keys[:]:
 					ex_temp[z].discard(choice)
-				# print(choice)
-				# print(ex_temp)
 			else:
-				print("|", end="")
-			# print(end_list)
-			# print(len(end_list), end="|")
+				print_multi("|", end="")
+
 			if len(end_list) == len(keys):
-				# print(counter)
-				print()
+				print_multi("")
 				break
 		except:
-			print(f"/", end="")
+			print_multi(f"/", end="")
 			pass
 	else:
-		print(f"Algorithm haven't found any solution")
-	print(end_list)
+		print_multi(f"Algorithm haven't found any solution")
+
+	return end_list
 
 
 def index_exercise(d_list):
@@ -182,22 +185,48 @@ def index_exercise(d_list):
 	return t_list
 
 
+def print_multi(string_t, file_t=None, end="\n"):
+	print(string_t, end="")
+	print(end, end="")
+
+	if file_t:
+		with open(file_t, "a") as f:
+			f.write(string_t)
+			f.write(end)
+
+
 def print_declarations(declaration_list):
 	for i in declaration_list:
-		print(i)
+		print_multi(i)
 
 
-def print_students_ex(d_list, ex_list, max_len=0):
+def print_students_ex(d_list, ex_list, file_t = None):
+
+	max_len = max([len(d.name) for d in d_list])
+	c_ex = len(str(max(ex_list)))
+
+	print_multi("", file_t)
 	for ex in ex_list:
-		c_ex = len(str(max(ex_list)))
-		c = [1 for d in d_list if ex in d.declared_ex].count(1)
-		print(f"{ex:{c_ex}} |", end="")
+		print_multi(f"{ex:{c_ex}} |", file_t, end="")
+
+		c = 0
 		for d in d_list:
 			if ex in d.declared_ex:
-				print(f" {d.name:{max_len}} |", end="")
-		print()
-		print("-"*(c_ex+2+c*(max_len+3)))
+				print_multi(f" {d.name:{max_len}} |", file_t, end="")
+				c += 1
 
+		print_multi("", file_t)
+		print_multi("-"*(c_ex+2+c*(max_len+3)), file_t)
+
+
+
+def print_solution(d_list, solution, file_t=None):
+	d_dict = {d.uid: d for d in d_list}
+	max_len = max([len(d.name) for d in d_list])
+
+	print_multi("", file_t)
+	for i in solution:
+		print_multi(f"{i[0]} -> {d_dict[i[1]].name:{max_len}} ({d_dict[i[1]].index})", file_t)
 
 if __name__ == "__main__":
 	# Get options
@@ -207,13 +236,15 @@ if __name__ == "__main__":
 	required = ["date_to", "date_from"]
 	for r in required:
 	    if options.__dict__[r] is None:
-	        print(f"Parameter {r} is required")	
+	        print_multi(f"Parameter {r} is required")	
 	        sys.exit()
 
 	# Fetch mails
 	d_list = get_mails(options)
+	# Print mails
 	print_declarations(d_list)
 
+	# Choose range of exercises
 	if options.ex_to and options.ex_from:
 		ex_list = list([x for x in range(options.ex_from, (options.ex_to+1))])
 	elif options.ex_manualy: 
@@ -221,7 +252,9 @@ if __name__ == "__main__":
 	else:
 		ex_list = index_exercise(d_list)
 
-	max_name = len(max([d.name for d in d_list]))
-	print_students_ex(d_list, ex_list, max_name)
+	# Print students with names
+	print_students_ex(d_list, ex_list, options.output_file)
 
-	solution = assign_alg(d_list, ex_list)
+	# Assign students to exercise
+	solution = assign_alg(d_list, ex_list, options)
+	print_solution(d_list, solution, options.output_file)
