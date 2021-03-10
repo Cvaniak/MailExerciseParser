@@ -1,5 +1,4 @@
 from imap_tools import MailBox, AND
-from tinydb import TinyDB, Query
 from optparse import OptionParser, OptionValueError
 from itertools import chain
 from collections import defaultdict
