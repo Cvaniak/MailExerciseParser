@@ -16,6 +16,71 @@ load_dotenv()
 DEFAULT_HOST = "imap.gmail.com"
 ALLOW_LESSSECURE = "https://myaccount.google.com/lesssecureapps"
 
+
+def callback_create_dotenv(option, opt, value, parser):
+	last_host = os.getenv("HOST") if os.getenv("HOST") else DEFAULT_HOST
+	host_name = input(f"HOST = ({last_host})") or last_host
+	last_mail = f"({os.getenv('MAIL')}) or type new -> " if os.getenv('MAIL') else ""
+	mail = input(f"Your mail = {last_mail}") or os.getenv("MAIL")
+	if os.getenv("PASSWORD"):
+		pass_mes = "(leave last password) or type new *HIDDEN*"
+	else:
+		pass_mes = "(leave empty) or type new password *HIDDEN*"
+	password = getpass.getpass((f"Your password = {pass_mes}")) or os.getenv("PASSWORD")
+	f = open(".env", "w")
+	f.write(f"HOST='{host_name}'\n")
+	f.write(f"MAIL='{mail}'\n")
+	f.write(f"PASSWORD='{password}'\n")
+	f.close()
+	load_dotenv()
+
+
+def callback_open_lesssecure(option, opt, value, parser):
+	webbrowser.open(ALLOW_LESSSECURE)
+
+
+def callback_date(option, opt, value, parser):
+	try:	
+		setattr(parser.values, option.dest, datetime.datetime.strptime(value,'%d.%m.%Y'))
+	except Exception as e:
+		raise OptionValueError(f"Wrong date format {e}")
+
+
+def callback_set_manualy(option, opt, value, parser):
+	try:
+		setattr(parser.values, option.dest, value)
+	except:
+		raise OptionValueError(f"{e}")
+
+
+def parse_options():
+	parser = OptionParser()
+	parser.add_option("-s", "--lesssecure",
+					  action="callback",
+					  help=f"Opens browser on {ALLOW_LESSSECURE} to enable lesssecureapps on gmail",
+					  callback=callback_open_lesssecure)
+	parser.add_option("-e", "--env",
+					  action="callback", 
+					  help="Setup host, mail and password in .env", callback=callback_create_dotenv)
+	parser.add_option("-f", "--date_from",
+	                  action="callback", type="string",
+	                  help="Newer mails than this date will be checked", callback=callback_date)
+	parser.add_option("-t", "--date_to",
+	                  action="callback", type="string",
+	                  help="Older mails than this date will be chcked", callback=callback_date)
+	parser.add_option("-x", "--ex_from",
+	                  action="store", type="int", dest="ex_from",
+	                  help="The smallest index of exercise")
+	parser.add_option("-y", "--ex_to",
+	                  action="store", type="int", dest="ex_to",
+	                  help="The smallest index of exercise")
+	parser.add_option("-z", "--ex_manualy",
+	                  action="callback", type="string",
+	                  help="The smallest index of exercise", callback=callback_set_manualy)
+
+	return parser
+
+
 class Declaration:
 	declared_ex = None
 	def __init__(self, mailObject):
@@ -50,24 +115,6 @@ class Declaration:
 			f"List = {self.declared_ex or 'Not parsed or empty'}\n")
 
 
-def create_dotenv(option, opt, value, parser):
-	last_host = os.getenv("HOST") if os.getenv("HOST") else DEFAULT_HOST
-	host_name = input(f"HOST = ({last_host})") or last_host
-	last_mail = f"({os.getenv('MAIL')}) or type new -> " if os.getenv('MAIL') else ""
-	mail = input(f"Your mail = {last_mail}") or os.getenv("MAIL")
-	if os.getenv("PASSWORD"):
-		pass_mes = "(leave last password) or type new *HIDDEN*"
-	else:
-		pass_mes = "(leave empty) or type new password *HIDDEN*"
-	password = getpass.getpass((f"Your password = {pass_mes}")) or os.getenv("PASSWORD")
-	f = open(".env", "w")
-	f.write(f"HOST='{host_name}'\n")
-	f.write(f"MAIL='{mail}'\n")
-	f.write(f"PASSWORD='{password}'\n")
-	f.close()
-	load_dotenv()
-
-
 def get_mails(options):
 	host = os.getenv("HOST") or DEFAULT_HOST
 	login = os.getenv("MAIL") or input("Type your mail address: ")
@@ -82,77 +129,6 @@ def get_mails(options):
 	    		mail_list.append(dec)
 	    		temp_name.append(dec.name)
 	return mail_list
-
-
-def print_declarations(declaration_list):
-	for i in declaration_list:
-		print(i)
-
-
-def open_lesssecure(option, opt, value, parser):
-	webbrowser.open(ALLOW_LESSSECURE)
-
-
-def date_callback(option, opt, value, parser):
-	# print(f"{option}, {opt}, {value}, {parser}")
-	try:	
-		setattr(parser.values, option.dest, datetime.datetime.strptime(value,'%d.%m.%Y'))
-	except Exception as e:
-		raise OptionValueError(f"Wrong date format {e}")
-
-
-def index_exercise(d_list):
-	t_list = list(set(chain.from_iterable([x.declared_ex for x in d_list])))
-	t_list.sort()
-	return t_list
-
-
-def print_students_ex(d_list, ex_list, max_len=0):
-	for ex in ex_list:
-		c_ex = len(str(max(ex_list)))
-		c = [1 for d in d_list if ex in d.declared_ex].count(1)
-		# print("-"*(c_ex+2+c*(max_len+3)))
-		print(f"{ex:{c_ex}} |", end="")
-		for d in d_list:
-			if ex in d.declared_ex:
-				print(f" {d.name:{max_len}} |", end="")
-		print()
-		print("-"*(c_ex+2+c*(max_len+3)))
-
-
-def set_manualy(option, opt, value, parser):
-	try:
-		setattr(parser.values, option.dest, value)
-	except:
-		raise OptionValueError(f"{e}")
-
-
-def parse_options():
-	parser = OptionParser()
-	parser.add_option("-s", "--lesssecure",
-					  action="callback",
-					  help=f"Opens browser on {ALLOW_LESSSECURE} to enable lesssecureapps on gmail",
-					  callback=open_lesssecure)
-	parser.add_option("-e", "--env",
-					  action="callback", 
-					  help="Setup host, mail and password in .env", callback=create_dotenv)
-	parser.add_option("-f", "--date_from",
-	                  action="callback", type="string",
-	                  help="Newer mails than this date will be checked", callback=date_callback)
-	parser.add_option("-t", "--date_to",
-	                  action="callback", type="string",
-	                  help="Older mails than this date will be chcked", callback=date_callback)
-	parser.add_option("-x", "--ex_from",
-	                  action="store", type="int", dest="ex_from",
-	                  help="The smallest index of exercise")
-	parser.add_option("-y", "--ex_to",
-	                  action="store", type="int", dest="ex_to",
-	                  help="The smallest index of exercise")
-	parser.add_option("-z", "--ex_manualy",
-	                  action="callback", type="string",
-	                  help="The smallest index of exercise", callback=set_manualy)
-
-	return parser
 
 
 def assign_alg(d_list, ex_list):
@@ -200,16 +176,41 @@ def assign_alg(d_list, ex_list):
 	print(end_list)
 
 
+def index_exercise(d_list):
+	t_list = list(set(chain.from_iterable([x.declared_ex for x in d_list])))
+	t_list.sort()
+	return t_list
+
+
+def print_declarations(declaration_list):
+	for i in declaration_list:
+		print(i)
+
+
+def print_students_ex(d_list, ex_list, max_len=0):
+	for ex in ex_list:
+		c_ex = len(str(max(ex_list)))
+		c = [1 for d in d_list if ex in d.declared_ex].count(1)
+		print(f"{ex:{c_ex}} |", end="")
+		for d in d_list:
+			if ex in d.declared_ex:
+				print(f" {d.name:{max_len}} |", end="")
+		print()
+		print("-"*(c_ex+2+c*(max_len+3)))
+
+
 if __name__ == "__main__":
+	# Get options
 	(options, args) = parse_options().parse_args()
-	# db = TinyDB('db.json')
-	# print(f"{options}, {args}")
+
+	# Check for required values
 	required = ["date_to", "date_from"]
 	for r in required:
 	    if options.__dict__[r] is None:
 	        print(f"Parameter {r} is required")	
 	        sys.exit()
 
+	# Fetch mails
 	d_list = get_mails(options)
 	print_declarations(d_list)
 
@@ -219,9 +220,7 @@ if __name__ == "__main__":
 		ex_list = list(map(int, options.ex_manualy.split(",")))
 	else:
 		ex_list = index_exercise(d_list)
-	# print(ex_list)
 
-	# print(d_list)
 	max_name = len(max([d.name for d in d_list]))
 	print_students_ex(d_list, ex_list, max_name)
 
