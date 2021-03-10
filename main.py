@@ -41,7 +41,11 @@ def callback_open_lesssecure(option, opt, value, parser):
 
 def callback_date(option, opt, value, parser):
 	try:	
-		setattr(parser.values, option.dest, datetime.datetime.strptime(value,'%d.%m.%Y'))
+		date_t = datetime.datetime.strptime(value,'%d.%m.%Y')
+		if option.dest == "date_to":
+			date_t += datetime.timedelta(days=1)
+		setattr(parser.values, option.dest, date_t)	
+
 	except Exception as e:
 		raise OptionValueError(f"Wrong date format {e}")
 
